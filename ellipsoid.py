@@ -21,61 +21,58 @@ class EllipsoidTool:
         http://cctbx.sourceforge.net/current/python/scitbx.math.minimum_covering_ellipsoid.html
         Which is based on the first reference anyway!
         
-        Here, P is a numpy array of 3D points like this:
-        P = [[x,y,z],
-             [x,y,z],
-             [x,y,z]]
+        Here, P is a numpy array of N dimensional points like this:
+        P = [[x,y,z,...], <-- one point per line
+             [x,y,z,...],
+             [x,y,z,...]]
         
         Returns:
         (center, radii, rotation)
         
         """
         (N, d) = np.shape(P)
+        d = float(d)
     
-        # This method only works well if the points are
-        # centered around the origin
-        min_P = np.min(P, axis=0)
-        P -= min_P
-        max_P = np.max(P, axis=0)/2
-        P -= max_P
-    
-        # Q will be out working array
-        Q = np.copy(P.T)
-        Q = np.vstack([Q, np.ones(N)])
-    
+        # Q will be our working array
+        Q = np.vstack([np.copy(P.T), np.ones(N)]) 
+        QT = Q.T
+        
         # initializations
-        err = 1 + tolerance
-        u = np.array([1.0 / N for i in range(N)]) # first iteration
-    
+        err = 1.0 + tolerance
+        u = (1.0 / N) * np.ones(N)
+
         # Khachiyan Algorithm
         while err > tolerance:
-            X = np.dot(Q, np.dot(np.diag(u), Q.T))
-            M = np.diag(np.dot(Q.T , np.dot(linalg.inv(X), Q)))    # M the diagonal vector of an NxN matrix
+            V = np.dot(Q, np.dot(np.diag(u), QT))
+            M = np.diag(np.dot(QT , np.dot(linalg.inv(V), Q)))    # M the diagonal vector of an NxN matrix
             j = np.argmax(M)
             maximum = M[j]
-            step_size = (maximum - d - 1) / ((d + 1) * (maximum - 1))
-            new_u = np.array([i * (1 - step_size) for i in u])
+            step_size = (maximum - d - 1.0) / ((d + 1.0) * (maximum - 1.0))
+            new_u = (1.0 - step_size) * u
             new_u[j] += step_size
             err = np.linalg.norm(new_u - u)
             u = new_u
-    
+
         # center of the ellipse 
         center = np.dot(P.T, u)
     
         # the A matrix for the ellipse
-        A = linalg.inv( np.dot(P.T, np.dot(np.diag(u), P)) - np.dot(center, center.T) ) / float(d)
-    
+        A = linalg.inv(
+                       np.dot(P.T, np.dot(np.diag(u), P)) - 
+                       np.array([[a * b for b in center] for a in center])
+                       ) / d
+                       
         # Get the values we'd like to return
         U, s, rotation = linalg.svd(A)
         radii = 1.0/np.sqrt(s)
         
-        # fix P and center
-        P += (min_P + max_P)
-        center += (min_P + max_P)
-        
         return (center, radii, rotation)
 
-    def plotEllipsoid(self, center, radii, rotation, ax=None, plotAxes=False):
+    def getEllipsoidVolume(self, radii):
+        """Calculate the volume of the blob"""
+        return 0.75*np.pi*radii[0]*radii[1]*radii[2]
+
+    def plotEllipsoid(self, center, radii, rotation, ax=None, plotAxes=False, cageColor='b', cageAlpha=0.2):
         """Plot an ellipsoid"""
         make_ax = ax == None
         if make_ax:
@@ -109,10 +106,10 @@ class EllipsoidTool:
                 X3 = np.linspace(-p[0], p[0], 100) + center[0]
                 Y3 = np.linspace(-p[1], p[1], 100) + center[1]
                 Z3 = np.linspace(-p[2], p[2], 100) + center[2]
-                ax.plot(X3, Y3, Z3, color='r')
+                ax.plot(X3, Y3, Z3, color=cageColor)
     
         # plot ellipsoid
-        ax.plot_wireframe(x, y, z,  rstride=4, cstride=4, color='b', alpha=0.2)
+        ax.plot_wireframe(x, y, z,  rstride=4, cstride=4, color=cageColor, alpha=cageAlpha)
         
         if make_ax:
             plt.show()
@@ -122,11 +119,10 @@ class EllipsoidTool:
 if __name__ == "__main__":
     # make 100 random points
     P = np.reshape([random()*100 for i in range(300)],(100,3))
-    
+
     # find the ellipsoid
     ET = EllipsoidTool()
-    (center, radii, rotation) = ET.getMinVolEllipse(P, .001)
-
+    (center, radii, rotation) = ET.getMinVolEllipse(P, .01)
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
