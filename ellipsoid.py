@@ -70,7 +70,7 @@ class EllipsoidTool:
 
     def getEllipsoidVolume(self, radii):
         """Calculate the volume of the blob"""
-        return 0.75*np.pi*radii[0]*radii[1]*radii[2]
+        return 4./3.*np.pi*radii[0]*radii[1]*radii[2]
 
     def plotEllipsoid(self, center, radii, rotation, ax=None, plotAxes=False, cageColor='b', cageAlpha=0.2):
         """Plot an ellipsoid"""
